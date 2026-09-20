@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# voice-memo installer: links the script into ~/.local/bin and checks dependencies.
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+missing=0
+for cmd in pw-record ffmpeg ffprobe wl-copy omarchy flock numfmt setsid; do
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "missing dependency: $cmd"
+    missing=1
+  fi
+done
+[[ $missing -eq 0 ]] || { echo "Install the missing tools and re-run."; exit 1; }
+
+mkdir -p "$HOME/.local/bin"
+ln -sf "$PWD/voice-memo" "$HOME/.local/bin/voice-memo"
+chmod +x "$PWD/voice-memo"
+echo "Installed: ~/.local/bin/voice-memo -> $PWD/voice-memo"
+
+if ! grep -q "voice-memo" "$HOME/.config/hypr/bindings.lua" 2>/dev/null; then
+  cat <<'EOF'
+
+Add the keybinding to ~/.config/hypr/bindings.lua:
+
+    o.bind("SUPER + SHIFT + R", "Voice memo", "voice-memo")
+
+Hyprland reloads automatically on save. Validate with: hyprctl configerrors
+EOF
+else
+  echo "Keybinding already present in ~/.config/hypr/bindings.lua"
+fi

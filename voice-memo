@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# voice-memo — toggle voice recording on Omarchy/Hyprland.
+#
+# First run:  starts recording the default PipeWire source to a WAV in ~/Recordings
+#             and shows a persistent "Recording…" notification.
+# Second run: stops recording, encodes to MP3 (libmp3lame VBR ~165k), deletes the
+#             WAV, copies a file:// reference to the clipboard (text/uri-list),
+#             and swaps the notification for a "saved" summary.
+#
+# Deps: pw-record (pipewire), ffmpeg, wl-copy (wl-clipboard), omarchy (notifications).
+
+set -u
+
+OUT_DIR="${VOICE_MEMO_DIR:-$HOME/Recordings}"
+STATE="${XDG_RUNTIME_DIR:-/tmp}/voice-memo.state"
+LOCK="${XDG_RUNTIME_DIR:-/tmp}/voice-memo.lock"
+NOTIF_ID=4210
+
+notify() {
+  omarchy notification send --app-name "voice-memo" -r "$NOTIF_ID" "$@" >/dev/null 2>&1 || true
+}
+
+# Serialize toggle presses so a fast double-press can't race itself.
+exec 9>"$LOCK"
+flock -w 2 9 || exit 1
+
+start_recording() {
+  mkdir -p "$OUT_DIR"
+  local wav="$OUT_DIR/voice-$(date +%Y%m%d-%H%M%S).wav"
+
+  # 9>&- : the recorder must not inherit the lock fd, or it holds the flock forever.
+  setsid pw-record "$wav" 9>&- &
+  local pid=$!
+
+  if ! kill -0 "$pid" 2>/dev/null; then
+    notify -u critical -t 6000 "Voice memo failed" "pw-record could not start (mic available?)"
+    exit 1
+  fi
+
+  echo "$pid $wav" > "$STATE"
+  notify -u critical -t 0 "● Recording…" "Press SUPER+SHIFT+R to stop"
+}
+
+stop_recording() {
+  local pid wav
+  read -r pid wav < "$STATE"
+  rm -f "$STATE"
+
+  # State file pointing at a dead recorder = stale; clean up and bail.
+  if ! kill -0 "$pid" 2>/dev/null; then
+    rm -f "$wav"
+    notify -t 5000 "Voice memo discarded" "Recorder was not running (stale state cleaned up)"
+    exit 1
+  fi
+
+  # SIGINT lets pw-record finalize the WAV header; give it up to 3s.
+  kill -INT "$pid" 2>/dev/null
+  for _ in $(seq 30); do
+    kill -0 "$pid" 2>/dev/null || break
+    sleep 0.1
+  done
+  kill -9 "$pid" 2>/dev/null
+
+  [[ -s "$wav" ]] || { notify -u critical -t 6000 "Voice memo failed" "No audio captured"; exit 1; }
+
+  local mp3="${wav%.wav}.mp3"
+  if ! ffmpeg -y -loglevel error -i "$wav" -codec:a libmp3lame -q:a 4 "$mp3"; then
+    rm -f "$wav"
+    notify -u critical -t 6000 "Voice memo failed" "ffmpeg could not encode the recording"
+    exit 1
+  fi
+  rm -f "$wav"
+
+  # Clipboard: file reference so it pastes as a file (Slack, browsers, file managers).
+  # 9>&- : wl-copy stays alive to serve the clipboard; don't let it hold the lock.
+  printf 'file://%s\r\n' "$mp3" | wl-copy -t text/uri-list 9>&-
+
+  local secs dur size
+  secs=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$mp3" 2>/dev/null | cut -d. -f1)
+  dur=$(printf '%02d:%02d' "$(( ${secs:-0} / 60 ))" "$(( ${secs:-0} % 60 ))")
+  size=$(stat -c %s "$mp3" | numfmt --to=iec --suffix=B)
+
+  notify -t 8000 "Voice memo saved" "$(basename "$mp3") · $dur · $size
+Copied to clipboard — Ctrl+V to paste the file"
+}
+
+if [[ -f "$STATE" ]]; then
+  stop_recording
+else
+  start_recording
+fi

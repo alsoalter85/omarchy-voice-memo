@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Voice Memo — UI Mockup</title>
+<style>
+  :root {
+    --bg: #1a1b26; --bg-dark: #13141c; --bg-darker: #0e0e14; --bg-light: #24283b;
+    --fg: #a9b1d6; --fg-dim: #565f89; --fg-bright: #c0caf5;
+    --accent: #7aa2f7; --red: #f7768e; --green: #9ece6a; --yellow: #e0af68; --muted: #414868;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg-darker);
+    color: var(--fg);
+    font-family: "Cantarell", "Adwaita Sans", system-ui, sans-serif;
+    padding: 40px 48px 32px;
+  }
+  header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 28px; }
+  h1 { font-size: 22px; font-weight: 600; color: var(--fg-bright); letter-spacing: .3px; }
+  h1 .dim { color: var(--fg-dim); font-weight: 400; }
+  .kbd { display: inline-flex; gap: 6px; align-items: center; }
+  .kbd span {
+    background: var(--bg-light); border: 1px solid var(--muted); border-bottom-width: 3px;
+    border-radius: 6px; padding: 4px 10px; font-size: 12px; font-weight: 600;
+    color: var(--fg-bright); font-family: "JetBrainsMono Nerd Font", monospace;
+  }
+  .kbd em { color: var(--fg-dim); font-style: normal; font-size: 12px; }
+
+  .frames { display: flex; gap: 28px; }
+  .frame { flex: 1; }
+  .frame .caption {
+    margin-top: 14px; font-size: 13px; color: var(--fg-dim); text-align: center; line-height: 1.5;
+  }
+  .frame .caption b { color: var(--fg); font-weight: 600; }
+
+  /* mini desktop */
+  .desktop {
+    position: relative; height: 420px; border-radius: 12px; overflow: hidden;
+    background: radial-gradient(1200px 600px at 30% 20%, #24283b 0%, var(--bg) 55%, var(--bg-dark) 100%);
+    border: 1px solid #2f344d;
+  }
+  /* omarchy shell bar */
+  .bar {
+    height: 34px; background: rgba(14,14,20,.82); backdrop-filter: blur(6px);
+    display: flex; align-items: center; padding: 0 12px; gap: 14px;
+    border-bottom: 1px solid rgba(65,72,104,.5); font-size: 11.5px;
+  }
+  .workspaces { display: flex; gap: 5px; }
+  .ws { width: 16px; height: 16px; border-radius: 4px; display: grid; place-items: center;
+        color: var(--fg-dim); font-size: 9.5px; background: var(--bg-light); }
+  .ws.active { background: var(--accent); color: var(--bg-darker); font-weight: 700; }
+  .win-title { color: var(--fg-dim); }
+  .bar .spacer { flex: 1; }
+  .tray { display: flex; gap: 12px; align-items: center; color: var(--fg); font-size: 11px; }
+  .tray .mic { color: var(--fg-dim); }
+  .tray .mic.live { color: var(--red); animation: pulse 1.2s infinite; }
+  .clock { color: var(--fg-bright); font-weight: 600; }
+
+  /* notification card (omarchy shell style) */
+  .notif {
+    position: absolute; top: 46px; right: 12px; width: 296px;
+    background: rgba(26,27,38,.96); border: 1px solid var(--muted);
+    border-radius: 12px; padding: 13px 14px 12px;
+    box-shadow: 0 12px 32px rgba(0,0,0,.5);
+  }
+  .notif .app { display: flex; align-items: center; gap: 6px; font-size: 10px;
+    text-transform: uppercase; letter-spacing: .8px; color: var(--fg-dim); margin-bottom: 7px; }
+  .notif .app .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .notif .title { font-size: 13.5px; font-weight: 700; color: var(--fg-bright); display: flex; align-items: center; gap: 8px; }
+  .notif .body { font-size: 11.5px; color: var(--fg); margin-top: 4px; line-height: 1.45; }
+  .notif .meta { display: flex; gap: 6px; margin-top: 9px; flex-wrap: wrap; }
+  .chip { background: var(--bg-light); border-radius: 5px; padding: 3px 7px;
+          font-size: 9.5px; color: var(--fg); font-family: monospace; }
+  .chip.green { color: var(--green); }
+
+  .rec-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--red);
+             animation: pulse 1.2s infinite; flex: none; }
+  @keyframes pulse { 0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(247,118,142,.5); }
+                     50% { opacity: .55; box-shadow: 0 0 0 5px rgba(247,118,142,0); } }
+
+  .timer { font-family: "JetBrainsMono Nerd Font", monospace; font-size: 22px;
+           color: var(--fg-bright); margin-top: 8px; letter-spacing: 1px; }
+  .timer small { font-size: 10px; color: var(--fg-dim); letter-spacing: .4px; }
+
+  .wave { display: flex; align-items: center; gap: 2.5px; height: 30px; margin-top: 10px; }
+  .wave i { width: 3px; border-radius: 2px; background: var(--red); opacity: .85;
+            animation: wave 0.9s ease-in-out infinite; }
+  .wave.static i { background: var(--accent); animation: none; opacity: .7; }
+  @keyframes wave { 0%,100% { transform: scaleY(.35);} 50% { transform: scaleY(1);} }
+
+  .ok { width: 16px; height: 16px; border-radius: 50%; background: rgba(158,206,106,.15);
+        color: var(--green); display: inline-grid; place-items: center; font-size: 11px; flex: none; }
+  .clip-line { display: flex; align-items: center; gap: 6px; margin-top: 9px;
+               font-size: 11px; color: var(--green); }
+
+  /* idle hint */
+  .hint {
+    position: absolute; inset: 0; display: grid; place-items: center;
+  }
+  .hint .box {
+    border: 1.5px dashed var(--muted); border-radius: 12px; padding: 14px 22px;
+    text-align: center; color: var(--fg-dim); font-size: 12px; line-height: 2;
+  }
+
+  footer { margin-top: 26px; display: flex; justify-content: center; gap: 10px; align-items: center;
+           color: var(--fg-dim); font-size: 12.5px; }
+  footer .arrow { color: var(--accent); }
+  footer .step { background: var(--bg-light); padding: 5px 12px; border-radius: 6px; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Voice Memo <span class="dim">— recording indicator mockup · Tokyo Night</span></h1>
+    <div class="kbd"><span>SUPER</span><em>+</em><span>SHIFT</span><em>+</em><span>R</span></div>
+  </header>
+
+  <div class="frames">
+    <!-- STATE 1: idle -->
+    <div class="frame">
+      <div class="desktop">
+        <div class="bar">
+          <div class="workspaces"><span class="ws active">1</span><span class="ws">2</span><span class="ws">3</span></div>
+          <span class="win-title">ghostty ~</span>
+          <div class="spacer"></div>
+          <div class="tray"><span class="mic"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span><span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 10a12 12 0 0 1 16 0M7.5 13.5a7 7 0 0 1 9 0M11 17a2.5 2.5 0 0 1 2 0"/><circle cx="12" cy="19.5" r="1" fill="currentColor"/></svg></span><span><svg width="14" height="12" viewBox="0 0 28 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="2" y="6" width="21" height="12" rx="3"/><rect x="5" y="9" width="11" height="6" rx="1.5" fill="currentColor" stroke="none"/><path d="M25 10v4" stroke-linecap="round"/></svg></span><span class="clock">14:32</span></div>
+        </div>
+        <div class="hint"><div class="box">press <b style="color:#c0caf5">SUPER + SHIFT + R</b><br>from anywhere</div></div>
+      </div>
+      <div class="caption"><b>1 · Idle.</b> Nothing on screen. Global hotkey armed.</div>
+    </div>
+
+    <!-- STATE 2: recording -->
+    <div class="frame">
+      <div class="desktop">
+        <div class="bar">
+          <div class="workspaces"><span class="ws active">1</span><span class="ws">2</span><span class="ws">3</span></div>
+          <span class="win-title">ghostty ~</span>
+          <div class="spacer"></div>
+          <div class="tray"><span class="mic live"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span><span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 10a12 12 0 0 1 16 0M7.5 13.5a7 7 0 0 1 9 0M11 17a2.5 2.5 0 0 1 2 0"/><circle cx="12" cy="19.5" r="1" fill="currentColor"/></svg></span><span><svg width="14" height="12" viewBox="0 0 28 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="2" y="6" width="21" height="12" rx="3"/><rect x="5" y="9" width="11" height="6" rx="1.5" fill="currentColor" stroke="none"/><path d="M25 10v4" stroke-linecap="round"/></svg></span><span class="clock">14:32</span></div>
+        </div>
+        <div class="notif">
+          <div class="app"><span class="dot" style="background:var(--red)"></span>voice-memo · now</div>
+          <div class="title"><span class="rec-dot"></span>Recording…</div>
+          <div class="timer"><span id="t">00:00</span> <small>/ tmp</small></div>
+          <div class="wave" id="wave"></div>
+          <div class="body">Press <b>SUPER+SHIFT+R</b> again to stop</div>
+        </div>
+      </div>
+      <div class="caption"><b>2 · Recording.</b> Persistent critical notification: pulsing dot,<br>elapsed timer, live mic. WAV streams to <b>/tmp</b>.</div>
+    </div>
+
+    <!-- STATE 3: saved -->
+    <div class="frame">
+      <div class="desktop">
+        <div class="bar">
+          <div class="workspaces"><span class="ws active">1</span><span class="ws">2</span><span class="ws">3</span></div>
+          <span class="win-title">ghostty ~</span>
+          <div class="spacer"></div>
+          <div class="tray"><span class="mic"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span><span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 10a12 12 0 0 1 16 0M7.5 13.5a7 7 0 0 1 9 0M11 17a2.5 2.5 0 0 1 2 0"/><circle cx="12" cy="19.5" r="1" fill="currentColor"/></svg></span><span><svg width="14" height="12" viewBox="0 0 28 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="2" y="6" width="21" height="12" rx="3"/><rect x="5" y="9" width="11" height="6" rx="1.5" fill="currentColor" stroke="none"/><path d="M25 10v4" stroke-linecap="round"/></svg></span><span class="clock">14:33</span></div>
+        </div>
+        <div class="notif">
+          <div class="app"><span class="dot" style="background:var(--green)"></span>voice-memo · now</div>
+          <div class="title"><span class="ok">✓</span>Voice memo saved</div>
+          <div class="wave static" id="wave2"></div>
+          <div class="meta">
+            <span class="chip">voice-20260907-143215.mp3</span>
+            <span class="chip">00:42</span>
+            <span class="chip">680 KB</span>
+          </div>
+          <div class="clip-line">⧉ Copied to clipboard · audio/mpeg</div>
+        </div>
+      </div>
+      <div class="caption"><b>3 · Saved.</b> Same notification swaps in place (replace-id).<br>MP3 in <b>/tmp</b> + clipboard. Ctrl+V anywhere.</div>
+    </div>
+  </div>
+
+  <footer>
+    <span class="step">SUPER+SHIFT+R</span><span class="arrow">→</span>
+    <span class="step">speak</span><span class="arrow">→</span>
+    <span class="step">SUPER+SHIFT+R</span><span class="arrow">→</span>
+    <span class="step">/tmp/*.mp3 + clipboard</span>
+  </footer>
+
+<script>
+  // waveform bars
+  function bars(el, n, animated) {
+    for (let i = 0; i < n; i++) {
+      const b = document.createElement('i');
+      const h = 20 + Math.round(80 * Math.abs(Math.sin(i * 1.7) * .6 + Math.sin(i * .53) * .4));
+      b.style.height = h + '%';
+      if (animated) { b.style.animationDelay = (i * 0.07) + 's'; b.style.animationDuration = (0.7 + (i % 5) * 0.09) + 's'; }
+      el.appendChild(b);
+    }
+  }
+  bars(document.getElementById('wave'), 38, true);
+  bars(document.getElementById('wave2'), 38, false);
+
+  // elapsed timer
+  let s = 0;
+  setInterval(() => {
+    s++;
+    document.getElementById('t').textContent =
+      String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+  }, 1000);
+</script>
+</body>
+</html>
