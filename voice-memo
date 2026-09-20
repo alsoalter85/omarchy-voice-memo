@@ -67,7 +67,7 @@ start_recording() {
   fi
 
   echo "$pid $wav" > "$STATE"
-  notify -u critical -t 0 "● Recording…" "SUPER+SHIFT+R to stop · ESC to trash"
+  notify -u critical -t 0 "● Recording…" "F9 to stop · ESC to trash"
 
   # Arm the consuming ESC bind (defined in ~/.config/hypr/bindings.lua, disabled
   # by default): ESC now trashes the take and is NOT delivered to the focused

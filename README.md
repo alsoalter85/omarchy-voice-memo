@@ -10,8 +10,8 @@ ready to paste anywhere. Transcription runs fully offline via
 
 | Press | What happens |
 |---|---|
-| `SUPER+SHIFT+R` (1st) | Recording starts from the default mic; a persistent critical notification shows **● Recording…** |
-| `SUPER+SHIFT+R` (2nd) | Recording stops → MP3 (`~/Recordings/voice-<timestamp>.mp3`) → **clipboard gets the file reference immediately** → local transcription → transcript saved as `.txt` next to the MP3, **clipboard is replaced with the transcript text**, and the transcript is **auto-pasted into the focused window**; notification swaps to **Voice memo saved** with a text preview |
+| `F9` (1st press) | Recording starts from the default mic; a persistent critical notification shows **● Recording…** |
+| `F9` (2nd press) | Recording stops → MP3 (`~/Recordings/voice-<timestamp>.mp3`) → **clipboard gets the file reference immediately** → local transcription → transcript saved as `.txt` next to the MP3, **clipboard is replaced with the transcript text**, and the transcript is **auto-pasted into the focused window**; notification swaps to **Voice memo saved** with a text preview |
 | `ESC` (while recording) | Trashes the take to `/tmp/recordings-trashed/` (MP3 kept, no transcript, clipboard untouched). A consuming keybind is armed only while recording, so ESC never reaches the focused app mid-take — and behaves completely normally the rest of the time |
 
 Auto-paste uses `wtype` with `ctrl+v` by default. Terminals don't paste on
@@ -34,8 +34,9 @@ This symlinks `voice-memo` into `~/.local/bin` and checks dependencies.
 Then add the bindings to `~/.config/hypr/bindings.lua` (installer reminds you):
 
 ```lua
--- Toggle recording.
-o.bind("SUPER + SHIFT + R", "Voice memo", "voice-memo")
+-- Toggle recording. (F9 is Omarchy's voxtype push-to-talk by default — unbind it.)
+hl.unbind("F9")
+o.bind("F9", "Voice memo", "voice-memo")
 
 -- ESC-to-trash: consuming bind, armed only while recording (see "How it works").
 voice_memo_esc = hl.bind("ESCAPE", hl.dsp.exec_cmd("voice-memo cancel"),
