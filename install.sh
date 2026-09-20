@@ -5,7 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 missing=0
-for cmd in pw-record ffmpeg ffprobe wl-copy omarchy flock numfmt setsid mktemp; do
+for cmd in pw-record ffmpeg ffprobe wl-copy omarchy flock numfmt setsid mktemp wtype; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
     echo "missing dependency: $cmd"
     missing=1

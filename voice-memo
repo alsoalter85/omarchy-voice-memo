@@ -19,6 +19,18 @@
 #                         (default: text when transcription works, else file)
 #   VOICE_MEMO_REPLACEMENTS  find/replace map applied to transcripts
 #                         (default: ~/.config/voice-memo/replacements)
+#   VOICE_MEMO_TRASH_DIR  where 'voice-memo cancel' (ESC) saves trashed takes
+#                         (default: /tmp/recordings-trashed — auto-empties on reboot)
+#   VOICE_MEMO_AUTOPASTE  1 = paste the transcript into the focused window when
+#                         transcription finishes, 0 = clipboard only (default: 1)
+#   VOICE_MEMO_PASTE_KEYS key combo for autopaste, modifiers joined with '+'
+#                         (default: ctrl+v; use ctrl+shift+v for terminals)
+#
+# Deps for autopaste: wtype.
+#
+# Subcommands:
+#   voice-memo cancel   stop the current recording and trash it (no transcript,
+#                       clipboard untouched). Silent no-op when not recording.
 #
 # Replacements file format (one per line, case-insensitive substring match):
 #   scale stack = Scalestack
@@ -53,7 +65,7 @@ start_recording() {
   fi
 
   echo "$pid $wav" > "$STATE"
-  notify -u critical -t 0 "● Recording…" "Press SUPER+SHIFT+R to stop"
+  notify -u critical -t 0 "● Recording…" "SUPER+SHIFT+R to stop · ESC to trash"
 }
 
 # Transcribe an audio file with voxtype (whisper.cpp). Prints transcript on stdout,
@@ -95,27 +107,73 @@ apply_replacements() {
   printf '%s' "$text"
 }
 
-stop_recording() {
+# Stop the recorder described by the state file and clean up the state.
+# Prints the finalized WAV path. rc 1 = stale state (recorder already dead),
+# rc 2 = no audio captured. SIGINT lets pw-record finalize the WAV header.
+kill_recorder() {
   local pid wav
-  read -r pid wav < "$STATE"
+  read -r pid wav < "$STATE" || return 1
   rm -f "$STATE"
-
-  # State file pointing at a dead recorder = stale; clean up and bail.
   if ! kill -0 "$pid" 2>/dev/null; then
     rm -f "$wav"
-    notify -t 5000 "Voice memo discarded" "Recorder was not running (stale state cleaned up)"
-    exit 1
+    return 1
   fi
-
-  # SIGINT lets pw-record finalize the WAV header; give it up to 3s.
   kill -INT "$pid" 2>/dev/null
   for _ in $(seq 30); do
     kill -0 "$pid" 2>/dev/null || break
     sleep 0.1
   done
   kill -9 "$pid" 2>/dev/null
+  if [[ ! -s "$wav" ]]; then
+    rm -f "$wav"
+    return 2
+  fi
+  printf '%s' "$wav"
+}
 
-  [[ -s "$wav" ]] || { notify -u critical -t 6000 "Voice memo failed" "No audio captured"; exit 1; }
+# Paste the clipboard into the focused window via wtype. Key combo comes from
+# VOICE_MEMO_PASTE_KEYS (e.g. "ctrl+shift+v"); last token is the key.
+autopaste() {
+  command -v wtype >/dev/null 2>&1 || return 1
+  local combo="${VOICE_MEMO_PASTE_KEYS:-ctrl+v}"
+  local -a parts args=()
+  local m key
+  IFS='+' read -ra parts <<< "$combo"
+  key="${parts[-1]}"
+  unset 'parts[-1]'
+  for m in "${parts[@]}"; do args+=(-M "$m"); done
+  args+=(-k "$key")
+  for m in "${parts[@]}"; do args+=(-m "$m"); done
+  sleep 0.15   # let the clipboard owner settle and any stop-key release land
+  wtype "${args[@]}" >/dev/null 2>&1 || true
+}
+
+# ESC path: stop and stash the take in the trash dir. No transcription, no
+# clipboard changes; silent no-op when there is nothing to trash.
+trash_recording() {
+  local wav mp3 trash
+  wav=$(kill_recorder) || exit 0
+
+  trash="${VOICE_MEMO_TRASH_DIR:-/tmp/recordings-trashed}"
+  mkdir -p "$trash"
+  mp3="$trash/$(basename "${wav%.wav}").mp3"
+
+  if ffmpeg -y -loglevel error -i "$wav" -codec:a libmp3lame -q:a 4 "$mp3"; then
+    rm -f "$wav"
+    notify -t 6000 "Voice memo trashed" "$mp3"
+  else
+    rm -f "$wav"
+    notify -u critical -t 6000 "Voice memo failed" "ffmpeg could not encode the recording"
+  fi
+}
+
+stop_recording() {
+  local wav rc
+  wav=$(kill_recorder) && rc=0 || rc=$?
+  case $rc in
+    1) notify -t 5000 "Voice memo discarded" "Recorder was not running (stale state cleaned up)"; exit 1 ;;
+    2) notify -u critical -t 6000 "Voice memo failed" "No audio captured"; exit 1 ;;
+  esac
 
   local mp3="${wav%.wav}.mp3"
   if ! ffmpeg -y -loglevel error -i "$wav" -codec:a libmp3lame -q:a 4 "$mp3"; then
@@ -149,6 +207,7 @@ stop_recording() {
   # (skipped in file mode or when transcription produced nothing).
   if [[ -n "$transcript" && "${VOICE_MEMO_CLIPBOARD:-text}" != "file" ]]; then
     printf '%s' "$transcript" | wl-copy 9>&-
+    [[ "${VOICE_MEMO_AUTOPASTE:-1}" == "1" ]] && autopaste
   fi
 
   if [[ -n "$transcript" ]]; then
@@ -163,6 +222,11 @@ Copied to clipboard"
 File reference copied to clipboard (no transcript)"
   fi
 }
+
+if [[ "${1:-}" == "cancel" ]]; then
+  [[ -f "$STATE" ]] && trash_recording
+  exit 0
+fi
 
 if [[ -f "$STATE" ]]; then
   stop_recording
