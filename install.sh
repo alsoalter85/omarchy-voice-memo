@@ -36,9 +36,8 @@ if ! grep -q "voice-memo" "$HOME/.config/hypr/bindings.lua" 2>/dev/null; then
 
 Add the bindings to ~/.config/hypr/bindings.lua:
 
-    -- Toggle recording. (F9 is Omarchy's voxtype push-to-talk default — unbind it.)
-    hl.unbind("F9")
-    o.bind("F9", "Voice memo", "voice-memo")
+    -- Toggle recording.
+    o.bind("SUPER + SHIFT + R", "Voice memo", "voice-memo")
 
     -- ESC-to-trash: consuming bind, armed only while recording.
     voice_memo_esc = hl.bind("ESCAPE", hl.dsp.exec_cmd("voice-memo cancel"),
