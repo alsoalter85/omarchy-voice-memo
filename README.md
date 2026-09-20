@@ -6,8 +6,6 @@ transcribed `.txt` in `~/Recordings/`, and the transcript text on the clipboard,
 ready to paste anywhere. Transcription runs fully offline via
 [voxtype](https://github.com/peteonrails/voxtype) (whisper.cpp).
 
-![mockup](mockup/voice-memo-mockup.png)
-
 ## Usage
 
 | Press | What happens |
@@ -76,7 +74,3 @@ Two layers, since whisper doesn't learn on its own:
 | `VOICE_MEMO_DIR` | `~/Recordings` | Output directory |
 | `VOICE_MEMO_TRANSCRIBE` | `1` | `0` disables transcription |
 | `VOICE_MEMO_CLIPBOARD` | `text` | `text` = transcript, `file` = MP3 file reference |
-
-## Mockup
-
-`mockup/voice-memo-mockup.html` is the interactive design mockup (open in a browser).
