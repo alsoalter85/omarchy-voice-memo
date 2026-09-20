@@ -1,0 +1,5 @@
+# voice-memo replacements — applied to transcripts (case-insensitive substring).
+# Copy to ~/.config/voice-memo/replacements and edit.
+# Format:  heard text = replacement text
+scale stack = Scalestack
+scale-stack = Scalestack

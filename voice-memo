@@ -17,6 +17,12 @@
 #   VOICE_MEMO_TRANSCRIBE 1 = transcribe, 0 = off (default: 1)
 #   VOICE_MEMO_CLIPBOARD  "text" = transcript, "file" = mp3 file reference
 #                         (default: text when transcription works, else file)
+#   VOICE_MEMO_REPLACEMENTS  find/replace map applied to transcripts
+#                         (default: ~/.config/voice-memo/replacements)
+#
+# Replacements file format (one per line, case-insensitive substring match):
+#   scale stack = Scalestack
+#   # comments and blank lines are ignored
 
 set -u
 
@@ -67,6 +73,28 @@ transcribe() {
   rm -f "$tmpwav"
 }
 
+# Case-insensitive find/replace over the transcript, from a "from = to" map file.
+# (voxtype's own text.replacements only runs in its daemon output path, not in
+# 'voxtype transcribe', so we do it here.)
+apply_replacements() {
+  local file="$1" text="$2" line from to
+  [[ -f $file ]] || { printf '%s' "$text"; return; }
+  while IFS= read -r line; do
+    [[ $line =~ ^[[:space:]]*($|#) ]] && continue   # blank lines / comments
+    [[ $line == *=* ]] || continue
+    from="${line%%=*}"; to="${line#*=}"
+    from="${from#"${from%%[![:space:]]*}"}"; from="${from%"${from##*[![:space:]]}"}"  # trim
+    to="${to#"${to%%[![:space:]]*}"}"; to="${to%"${to##*[![:space:]]}"}"
+    [[ -n $from ]] || continue
+    # escape regex specials in <from>, escape / and & in both sides, then global
+    # case-insensitive substitute (GNU sed 'I' flag)
+    from=$(printf '%s' "$from" | sed 's|[\\/.^$*[]|\\&|g')
+    to=$(printf '%s' "$to" | sed 's|[\\&/]|\\&|g')
+    text=$(printf '%s' "$text" | sed "s/$from/$to/gi")
+  done < "$file"
+  printf '%s' "$text"
+}
+
 stop_recording() {
   local pid wav
   read -r pid wav < "$STATE"
@@ -112,6 +140,7 @@ stop_recording() {
     notify -t 0 "Voice memo saved" "Transcribing…"
     transcript=$(transcribe "$mp3")
     if [[ -n "$transcript" ]]; then
+      transcript=$(apply_replacements "${VOICE_MEMO_REPLACEMENTS:-$HOME/.config/voice-memo/replacements}" "$transcript")
       printf '%s\n' "$transcript" > "${mp3%.mp3}.txt"
     fi
   fi

@@ -25,6 +25,12 @@ ln -sf "$PWD/voice-memo" "$HOME/.local/bin/voice-memo"
 chmod +x "$PWD/voice-memo"
 echo "Installed: ~/.local/bin/voice-memo -> $PWD/voice-memo"
 
+if [[ ! -f "$HOME/.config/voice-memo/replacements" ]]; then
+  mkdir -p "$HOME/.config/voice-memo"
+  cp replacements.example "$HOME/.config/voice-memo/replacements"
+  echo "Seeded ~/.config/voice-memo/replacements — edit to add your own terms"
+fi
+
 if ! grep -q "voice-memo" "$HOME/.config/hypr/bindings.lua" 2>/dev/null; then
   cat <<'EOF'
 

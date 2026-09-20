@@ -57,6 +57,18 @@ download a bigger model, e.g. `small` or `large-v3-turbo`, and set `model = "sma
 - **Clipboard**: two-stage — `text/uri-list` file reference the moment the MP3 exists, then replaced by the transcript text when transcription finishes (`VOICE_MEMO_CLIPBOARD=file` keeps the file reference).
 - **Encoding**: `ffmpeg -codec:a libmp3lame -q:a 4` (VBR ~165 kbps).
 
+## Custom vocabulary
+
+Two layers, since whisper doesn't learn on its own:
+
+1. **Bias (prevention)** — `initial_prompt` in `~/.config/voxtype/config.toml` primes the
+   model with your terms, e.g. `initial_prompt = "Scalestack, Alessandro."`, so names and
+   brand words are spelled right the first time. Also improves punctuation.
+2. **Correction (guaranteed)** — `~/.config/voice-memo/replacements`, one `heard = replacement`
+   per line, applied case-insensitively to every transcript (see `replacements.example`).
+   This lives in voice-memo because voxtype's own `text.replacements` only runs in its
+   dictation daemon — `voxtype transcribe` bypasses it.
+
 ## Configuration
 
 | Env var | Default | Purpose |
