@@ -30,7 +30,9 @@
 #
 # Subcommands:
 #   voice-memo cancel   stop the current recording and trash it (no transcript,
-#                       clipboard untouched). Silent no-op when not recording.
+#                       clipboard untouched). Bound to ESC via a consuming bind
+#                       that is armed only while recording, so ESC never leaks
+#                       into the focused app. Silent no-op when not recording.
 #
 # Replacements file format (one per line, case-insensitive substring match):
 #   scale stack = Scalestack
@@ -66,6 +68,11 @@ start_recording() {
 
   echo "$pid $wav" > "$STATE"
   notify -u critical -t 0 "● Recording…" "SUPER+SHIFT+R to stop · ESC to trash"
+
+  # Arm the consuming ESC bind (defined in ~/.config/hypr/bindings.lua, disabled
+  # by default): ESC now trashes the take and is NOT delivered to the focused
+  # app. Disarmed again in kill_recorder().
+  hyprctl eval 'voice_memo_esc:set_enabled(true)' >/dev/null 2>&1 || true
 }
 
 # Transcribe an audio file with voxtype (whisper.cpp). Prints transcript on stdout,
@@ -114,6 +121,8 @@ kill_recorder() {
   local pid wav
   read -r pid wav < "$STATE" || return 1
   rm -f "$STATE"
+  # Disarm the consuming ESC bind (safe no-op when already disarmed).
+  hyprctl eval 'voice_memo_esc:set_enabled(false)' >/dev/null 2>&1 || true
   if ! kill -0 "$pid" 2>/dev/null; then
     rm -f "$wav"
     return 1

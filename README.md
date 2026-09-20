@@ -12,7 +12,7 @@ ready to paste anywhere. Transcription runs fully offline via
 |---|---|
 | `SUPER+SHIFT+R` (1st) | Recording starts from the default mic; a persistent critical notification shows **● Recording…** |
 | `SUPER+SHIFT+R` (2nd) | Recording stops → MP3 (`~/Recordings/voice-<timestamp>.mp3`) → **clipboard gets the file reference immediately** → local transcription → transcript saved as `.txt` next to the MP3, **clipboard is replaced with the transcript text**, and the transcript is **auto-pasted into the focused window**; notification swaps to **Voice memo saved** with a text preview |
-| `ESC` (while recording) | Trashes the take to `/tmp/recordings-trashed/` (MP3 kept, no transcript, clipboard untouched). The binding is non-consuming — apps still receive ESC, and it's a silent no-op when not recording |
+| `ESC` (while recording) | Trashes the take to `/tmp/recordings-trashed/` (MP3 kept, no transcript, clipboard untouched). A consuming keybind is armed only while recording, so ESC never reaches the focused app mid-take — and behaves completely normally the rest of the time |
 
 Auto-paste uses `wtype` with `ctrl+v` by default. Terminals don't paste on
 `ctrl+v` — set `VOICE_MEMO_PASTE_KEYS="ctrl+shift+v"` if you mostly paste into a
@@ -59,7 +59,7 @@ download a bigger model, e.g. `small` or `large-v3-turbo`, and set `model = "sma
 - **Transcription**: MP3 → 16 kHz mono WAV (what whisper wants) → `voxtype -q transcribe`; stdout noise lines are filtered, the rest is the transcript.
 - **Clipboard**: two-stage — `text/uri-list` file reference the moment the MP3 exists, then replaced by the transcript text when transcription finishes (`VOICE_MEMO_CLIPBOARD=file` keeps the file reference).
 - **Auto-paste**: after the transcript lands on the clipboard, `wtype` injects the paste combo into the focused window.
-- **Trash**: `voice-memo cancel` (bound to ESC, non-consuming) stops the recorder and encodes the take to the trash dir instead of `~/Recordings`, skipping transcription and clipboard.
+- **Trash**: `voice-memo cancel` stops the recorder and encodes the take to the trash dir instead of `~/Recordings`, skipping transcription and clipboard. It's wired to ESC via a consuming Hyprland bind that the script arms on record start and disarms on stop (`hyprctl eval 'voice_memo_esc:set_enabled(...)'`), so ESC is modal: captured only while a take is live.
 - **Encoding**: `ffmpeg -codec:a libmp3lame -q:a 4` (VBR ~165 kbps).
 
 ## Custom vocabulary
