@@ -25,6 +25,14 @@
 #                         transcription finishes, 0 = clipboard only (default: 1)
 #   VOICE_MEMO_PASTE_KEYS key combo for autopaste, modifiers joined with '+'
 #                         (default: ctrl+v; use ctrl+shift+v for terminals)
+#   VOICE_MEMO_AI         1 = run the transcript through an AI cleanup pass
+#                         (filler words, punctuation) before clipboard/paste
+#   VOICE_MEMO_AI_ENGINE  claude (default) | codex   (codex model via
+#                         VOICE_MEMO_AI_MODEL, default gpt-6-astra)
+#   VOICE_MEMO_AI_CMD     full override: any command, transcript on stdin,
+#                         cleaned text on stdout
+#   VOICE_MEMO_AI_TIMEOUT seconds before giving up and keeping the raw
+#                         transcript (default: 60)
 #
 # Deps for autopaste: wtype.
 #
@@ -39,6 +47,10 @@
 #   # comments and blank lines are ignored
 
 set -u
+
+# Optional user config (plain bash assignments) — see config.example.
+VOICE_MEMO_CONFIG="${VOICE_MEMO_CONFIG:-$HOME/.config/voice-memo/config}"
+[[ -f $VOICE_MEMO_CONFIG ]] && source "$VOICE_MEMO_CONFIG"
 
 OUT_DIR="${VOICE_MEMO_DIR:-$HOME/Recordings}"
 STATE="${XDG_RUNTIME_DIR:-/tmp}/voice-memo.state"
@@ -157,6 +169,38 @@ autopaste() {
   wtype "${args[@]}" >/dev/null 2>&1 || true
 }
 
+AI_PROMPT='Clean up this voice-memo transcript: remove filler words, fix punctuation and capitalization, keep the original language and meaning, do not summarize. Output ONLY the cleaned text.'
+
+# Optional AI cleanup pass. Prints the cleaned transcript, empty on any failure
+# (caller keeps the raw transcript as fallback).
+ai_cleanup() {
+  local timeout_s="${VOICE_MEMO_AI_TIMEOUT:-60}"
+  if [[ -n "${VOICE_MEMO_AI_CMD:-}" ]]; then
+    printf '%s' "$1" | timeout "$timeout_s" bash -c "$VOICE_MEMO_AI_CMD" 2>/dev/null
+    return
+  fi
+  case "${VOICE_MEMO_AI_ENGINE:-claude}" in
+    claude)
+      command -v claude >/dev/null 2>&1 || return 1
+      printf '%s' "$1" | timeout "$timeout_s" claude -p \
+        --model "${VOICE_MEMO_AI_MODEL:-haiku}" "$AI_PROMPT" 2>/dev/null
+      ;;
+    codex)
+      command -v codex >/dev/null 2>&1 || return 1
+      local out cleaned
+      out=$(mktemp /tmp/voice-memo-ai-XXXXXX) || return 1
+      ( cd /tmp && printf '%s' "$1" | timeout "$timeout_s" codex exec --ephemeral \
+          -s read-only --skip-git-repo-check \
+          -m "${VOICE_MEMO_AI_MODEL:-gpt-6-astra}" -c 'model_reasoning_effort="low"' \
+          -o "$out" "$AI_PROMPT" >/dev/null 2>&1 )
+      cleaned=""
+      [[ -s $out ]] && cleaned=$(<"$out")   # $(<) strips trailing newlines
+      rm -f "$out"
+      printf '%s' "$cleaned"
+      ;;
+  esac
+}
+
 # ESC path: stop and stash the take in the trash dir. No transcription, no
 # clipboard changes; silent no-op when there is nothing to trash.
 trash_recording() {
@@ -208,6 +252,12 @@ stop_recording() {
     transcript=$(transcribe "$mp3")
     if [[ -n "$transcript" ]]; then
       transcript=$(apply_replacements "${VOICE_MEMO_REPLACEMENTS:-$HOME/.config/voice-memo/replacements}" "$transcript")
+      if [[ "${VOICE_MEMO_AI:-0}" == "1" ]]; then
+        notify -t 0 "Voice memo saved" "Polishing with AI…"
+        local polished
+        polished=$(ai_cleanup "$transcript")
+        [[ -n "$polished" ]] && transcript="$polished"
+      fi
       printf '%s\n' "$transcript" > "${mp3%.mp3}.txt"
     fi
   fi

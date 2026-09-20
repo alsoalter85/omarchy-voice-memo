@@ -11,7 +11,7 @@ ready to paste anywhere. Transcription runs fully offline via
 | Press | What happens |
 |---|---|
 | `SUPER+SHIFT+R` (1st) | Recording starts from the default mic; a persistent critical notification shows **● Recording…** |
-| `SUPER+SHIFT+R` (2nd) | Recording stops → MP3 (`~/Recordings/voice-<timestamp>.mp3`) → **clipboard gets the file reference immediately** → local transcription → transcript saved as `.txt` next to the MP3, **clipboard is replaced with the transcript text**, and the transcript is **auto-pasted into the focused window**; notification swaps to **Voice memo saved** with a text preview |
+| `SUPER+SHIFT+R` (2nd) | Recording stops → MP3 (`~/Recordings/voice-<timestamp>.mp3`) → **clipboard gets the file reference immediately** → local transcription → **optional AI cleanup** (filler words, punctuation) → transcript saved as `.txt` next to the MP3, **clipboard is replaced with the final text**, and the text is **auto-pasted into the focused window**; notification swaps to **Voice memo saved** with a text preview |
 | `ESC` (while recording) | Trashes the take to `/tmp/recordings-trashed/` (MP3 kept, no transcript, clipboard untouched). A consuming keybind is armed only while recording, so ESC never reaches the focused app mid-take — and behaves completely normally the rest of the time |
 
 Auto-paste uses `wtype` with `ctrl+v` by default. Terminals don't paste on
@@ -64,6 +64,7 @@ download a bigger model, e.g. `small` or `large-v3-turbo`, and set `model = "sma
 - **Indicator**: `omarchy notification send -r 4210` — a fixed replace-id, so the "saved"/"transcribing" notifications swap in place instead of stacking. `-t 0` keeps it on screen while recording.
 - **Transcription**: MP3 → 16 kHz mono WAV (what whisper wants) → `voxtype -q transcribe`; stdout noise lines are filtered, the rest is the transcript.
 - **Clipboard**: two-stage — `text/uri-list` file reference the moment the MP3 exists, then replaced by the transcript text when transcription finishes (`VOICE_MEMO_CLIPBOARD=file` keeps the file reference).
+- **AI cleanup**: the transcript is piped through the configured CLI (`claude -p` or `codex exec`) with a cleanup prompt; empty/failed output simply falls back to the raw transcript.
 - **Auto-paste**: after the transcript lands on the clipboard, `wtype` injects the paste combo into the focused window.
 - **Trash**: `voice-memo cancel` stops the recorder and encodes the take to the trash dir instead of `~/Recordings`, skipping transcription and clipboard. It's wired to ESC via a consuming Hyprland bind (defined in `bindings.lua`, disabled at load) that the script arms on record start and disarms on stop via `hyprctl eval 'voice_memo_esc:set_enabled(...)'` — so ESC is modal: captured only while a take is live, passed through otherwise.
 - **Encoding**: `ffmpeg -codec:a libmp3lame -q:a 4` (VBR ~165 kbps).
@@ -80,6 +81,24 @@ Two layers, since whisper doesn't learn on its own:
    This lives in voice-memo because voxtype's own `text.replacements` only runs in its
    dictation daemon — `voxtype transcribe` bypasses it.
 
+## AI cleanup (optional)
+
+When enabled (`VOICE_MEMO_AI=1` in `~/.config/voice-memo/config`), the raw transcript is
+polished by an AI before it is saved/copied/pasted: filler words removed, punctuation and
+capitalization fixed, language and meaning preserved. If the AI call fails or times out,
+the raw transcript is used — the feature degrades gracefully, never blocks.
+
+Engines (set `VOICE_MEMO_AI_ENGINE` in the config):
+
+| Engine | Command used | Notes |
+|---|---|---|
+| `claude` (default) | `claude -p --model haiku` | fast; override model via `VOICE_MEMO_AI_MODEL` |
+| `codex` | `codex exec --ephemeral -s read-only -m gpt-6-astra …` | runs read-only + ephemeral; ~10 s extra latency |
+
+Or bypass the presets entirely: `VOICE_MEMO_AI_CMD='any-cmd --flags'` — the transcript goes
+in on stdin, the cleaned text comes out on stdout. `VOICE_MEMO_AI_TIMEOUT` (default 60 s)
+caps the wait.
+
 ## Configuration
 
 | Env var | Default | Purpose |
@@ -90,3 +109,9 @@ Two layers, since whisper doesn't learn on its own:
 | `VOICE_MEMO_AUTOPASTE` | `1` | `0` disables auto-pasting the transcript into the focused window |
 | `VOICE_MEMO_PASTE_KEYS` | `ctrl+v` | Auto-paste combo (`+`-joined modifiers + key); terminals usually need `ctrl+shift+v` |
 | `VOICE_MEMO_TRASH_DIR` | `/tmp/recordings-trashed` | Where ESC-trashed takes are saved (auto-empties on reboot) |
+| `VOICE_MEMO_AI` | `0` | `1` enables the AI cleanup pass (set in `~/.config/voice-memo/config`) |
+| `VOICE_MEMO_AI_ENGINE` | `claude` | `claude` or `codex` preset, ignored when `VOICE_MEMO_AI_CMD` is set |
+| `VOICE_MEMO_AI_MODEL` | `haiku` / `gpt-6-astra` | Model for the chosen engine |
+| `VOICE_MEMO_AI_CMD` | — | Full override: any command, transcript on stdin, cleaned text on stdout |
+| `VOICE_MEMO_AI_TIMEOUT` | `60` | Seconds before falling back to the raw transcript |
+| `VOICE_MEMO_CONFIG` | `~/.config/voice-memo/config` | Config file path (plain bash, sourced on every run) |
