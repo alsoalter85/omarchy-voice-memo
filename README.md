@@ -13,10 +13,11 @@ ready to paste anywhere. Transcription runs fully offline via
 | Press | What happens |
 |---|---|
 | `SUPER+SHIFT+R` (1st) | Recording starts from the default mic; a persistent critical notification shows **● Recording…** |
-| `SUPER+SHIFT+R` (2nd) | Recording stops → MP3 (`~/Recordings/voice-<timestamp>.mp3`) → local transcription → transcript saved as `.txt` next to the MP3 and copied to the clipboard; notification swaps to **Voice memo saved** with a text preview |
+| `SUPER+SHIFT+R` (2nd) | Recording stops → MP3 (`~/Recordings/voice-<timestamp>.mp3`) → **clipboard gets the file reference immediately** → local transcription → transcript saved as `.txt` next to the MP3 and **clipboard is replaced with the transcript text**; notification swaps to **Voice memo saved** with a text preview |
 
-If transcription fails or no speech is detected, the clipboard falls back to a
-`text/uri-list` file reference for the MP3.
+So the clipboard is two-stage: paste right away for the MP3 file, or wait ~1–2s
+(after the "Transcribing…" swap) and paste the text. If transcription fails or no
+speech is detected, the clipboard simply keeps the file reference.
 
 Recordings live **only** in `~/Recordings/` (nothing in `/tmp` survives a reboot — this keeps them).
 
@@ -53,7 +54,7 @@ download a bigger model, e.g. `small` or `large-v3-turbo`, and set `model = "sma
 - **Clean WAV**: recorder is stopped with `SIGINT` so `pw-record` finalizes the WAV header before exit.
 - **Indicator**: `omarchy notification send -r 4210` — a fixed replace-id, so the "saved"/"transcribing" notifications swap in place instead of stacking. `-t 0` keeps it on screen while recording.
 - **Transcription**: MP3 → 16 kHz mono WAV (what whisper wants) → `voxtype -q transcribe`; stdout noise lines are filtered, the rest is the transcript.
-- **Clipboard**: transcript text by default; file reference (`text/uri-list`) as fallback or via `VOICE_MEMO_CLIPBOARD=file`.
+- **Clipboard**: two-stage — `text/uri-list` file reference the moment the MP3 exists, then replaced by the transcript text when transcription finishes (`VOICE_MEMO_CLIPBOARD=file` keeps the file reference).
 - **Encoding**: `ffmpeg -codec:a libmp3lame -q:a 4` (VBR ~165 kbps).
 
 ## Configuration

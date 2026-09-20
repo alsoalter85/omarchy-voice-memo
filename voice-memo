@@ -4,9 +4,10 @@
 # First run:  starts recording the default PipeWire source to a WAV in ~/Recordings
 #             and shows a persistent "Recording…" notification.
 # Second run: stops recording, encodes to MP3 (libmp3lame VBR ~165k), deletes the
-#             WAV, transcribes it locally via voxtype (whisper.cpp), saves the
-#             transcript next to the MP3 (.txt), copies the transcript text to the
-#             clipboard, and swaps the notification for a "saved" summary.
+#             WAV, and immediately copies a file reference to the clipboard. Then it
+#             transcribes locally via voxtype (whisper.cpp), saves the transcript
+#             next to the MP3 (.txt), and replaces the clipboard with the transcript
+#             text. Two-stage clipboard: file ref first, transcript when ready.
 #
 # Deps: pw-record (pipewire), ffmpeg, wl-copy (wl-clipboard), omarchy (notifications),
 #       voxtype (transcription; optional — falls back to file-reference clipboard).
@@ -66,15 +67,6 @@ transcribe() {
   rm -f "$tmpwav"
 }
 
-copy_to_clipboard() {
-  # 9>&- : wl-copy stays alive to serve the clipboard; don't let it hold the lock.
-  if [[ -n "$1" && "${VOICE_MEMO_CLIPBOARD:-text}" != "file" ]]; then
-    printf '%s' "$1" | wl-copy 9>&-
-  else
-    printf 'file://%s\r\n' "$2" | wl-copy -t text/uri-list 9>&-
-  fi
-}
-
 stop_recording() {
   local pid wav
   read -r pid wav < "$STATE"
@@ -110,6 +102,10 @@ stop_recording() {
   dur=$(printf '%02d:%02d' "$(( ${secs:-0} / 60 ))" "$(( ${secs:-0} % 60 ))")
   size=$(stat -c %s "$mp3" | numfmt --to=iec --suffix=B)
 
+  # Clipboard stage 1: MP3 file reference, available immediately.
+  # (9>&- : wl-copy stays alive to serve the clipboard; don't let it hold the lock.)
+  printf 'file://%s\r\n' "$mp3" | wl-copy -t text/uri-list 9>&-
+
   # Transcribe (swap the notification to show progress — the model load can take a moment).
   local transcript=""
   if [[ "${VOICE_MEMO_TRANSCRIBE:-1}" == "1" ]] && command -v voxtype >/dev/null 2>&1; then
@@ -120,7 +116,11 @@ stop_recording() {
     fi
   fi
 
-  copy_to_clipboard "$transcript" "$mp3"
+  # Clipboard stage 2: replace the file reference with the transcript text
+  # (skipped in file mode or when transcription produced nothing).
+  if [[ -n "$transcript" && "${VOICE_MEMO_CLIPBOARD:-text}" != "file" ]]; then
+    printf '%s' "$transcript" | wl-copy 9>&-
+  fi
 
   if [[ -n "$transcript" ]]; then
     local preview
