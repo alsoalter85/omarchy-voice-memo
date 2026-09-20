@@ -115,3 +115,7 @@ caps the wait.
 | `VOICE_MEMO_AI_CMD` | — | Full override: any command, transcript on stdin, cleaned text on stdout |
 | `VOICE_MEMO_AI_TIMEOUT` | `60` | Seconds before falling back to the raw transcript |
 | `VOICE_MEMO_CONFIG` | `~/.config/voice-memo/config` | Config file path (plain bash, sourced on every run) |
+
+## License
+
+[MIT](LICENSE)
