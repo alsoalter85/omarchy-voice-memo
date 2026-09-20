@@ -5,13 +5,20 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 missing=0
-for cmd in pw-record ffmpeg ffprobe wl-copy omarchy flock numfmt setsid; do
+for cmd in pw-record ffmpeg ffprobe wl-copy omarchy flock numfmt setsid mktemp; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
     echo "missing dependency: $cmd"
     missing=1
   fi
 done
 [[ $missing -eq 0 ]] || { echo "Install the missing tools and re-run."; exit 1; }
+
+if command -v voxtype >/dev/null 2>&1; then
+  echo "voxtype found — transcription enabled."
+else
+  echo "note: voxtype not found — install with 'omarchy voxtype install' for transcription."
+  echo "      (voice-memo still works; clipboard falls back to the MP3 file reference)"
+fi
 
 mkdir -p "$HOME/.local/bin"
 ln -sf "$PWD/voice-memo" "$HOME/.local/bin/voice-memo"

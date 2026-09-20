@@ -1,8 +1,10 @@
 # voice-memo
 
-One-hotkey voice memos for Omarchy / Hyprland. Press once to start recording,
-press again to stop — you get an MP3 in `~/Recordings/` and a file reference on
-the clipboard, ready to paste into Slack, a browser upload, or a file manager.
+One-hotkey voice memos for Omarchy / Hyprland, with **local transcription**.
+Press once to start recording, press again to stop — you get an MP3 plus a
+transcribed `.txt` in `~/Recordings/`, and the transcript text on the clipboard,
+ready to paste anywhere. Transcription runs fully offline via
+[voxtype](https://github.com/peteonrails/voxtype) (whisper.cpp).
 
 ![mockup](mockup/voice-memo-mockup.png)
 
@@ -11,7 +13,10 @@ the clipboard, ready to paste into Slack, a browser upload, or a file manager.
 | Press | What happens |
 |---|---|
 | `SUPER+SHIFT+R` (1st) | Recording starts from the default mic; a persistent critical notification shows **● Recording…** |
-| `SUPER+SHIFT+R` (2nd) | Recording stops, WAV → MP3 (`~/Recordings/voice-<timestamp>.mp3`), WAV deleted, clipboard gets a `text/uri-list` file reference, notification swaps to **Voice memo saved** |
+| `SUPER+SHIFT+R` (2nd) | Recording stops → MP3 (`~/Recordings/voice-<timestamp>.mp3`) → local transcription → transcript saved as `.txt` next to the MP3 and copied to the clipboard; notification swaps to **Voice memo saved** with a text preview |
+
+If transcription fails or no speech is detected, the clipboard falls back to a
+`text/uri-list` file reference for the MP3.
 
 Recordings live **only** in `~/Recordings/` (nothing in `/tmp` survives a reboot — this keeps them).
 
@@ -33,18 +38,31 @@ Hyprland auto-reloads on save; verify with `hyprctl configerrors`.
 ## Dependencies
 
 All stock on Omarchy: `pw-record` (PipeWire), `ffmpeg`, `wl-copy` (wl-clipboard), `omarchy` (notifications).
+Transcription: `voxtype` (`omarchy voxtype install`).
+
+### Transcription engine
+
+Model and language are voxtype's own settings (`~/.config/voxtype/config.toml` or
+`voxtype configure`). Default is the `base` whisper model with `language = "auto"`
+(Italian, English, … are auto-detected). For better accuracy at the cost of speed,
+download a bigger model, e.g. `small` or `large-v3-turbo`, and set `model = "small"`.
 
 ## How it works
 
 - **Toggle script**: state file in `$XDG_RUNTIME_DIR` holds `<pid> <wav-path>`; presence of the file means "recording". An `flock` serializes rapid key presses.
 - **Clean WAV**: recorder is stopped with `SIGINT` so `pw-record` finalizes the WAV header before exit.
-- **Indicator**: `omarchy notification send -r 4210` — a fixed replace-id, so the "saved" notification swaps in place instead of stacking. `-t 0` keeps it on screen while recording.
-- **Clipboard**: `wl-copy -t text/uri-list` with a `file://` URI, so paste targets treat it as a file attachment rather than raw audio bytes.
+- **Indicator**: `omarchy notification send -r 4210` — a fixed replace-id, so the "saved"/"transcribing" notifications swap in place instead of stacking. `-t 0` keeps it on screen while recording.
+- **Transcription**: MP3 → 16 kHz mono WAV (what whisper wants) → `voxtype -q transcribe`; stdout noise lines are filtered, the rest is the transcript.
+- **Clipboard**: transcript text by default; file reference (`text/uri-list`) as fallback or via `VOICE_MEMO_CLIPBOARD=file`.
 - **Encoding**: `ffmpeg -codec:a libmp3lame -q:a 4` (VBR ~165 kbps).
 
 ## Configuration
 
-- `VOICE_MEMO_DIR` env var overrides `~/Recordings`.
+| Env var | Default | Purpose |
+|---|---|---|
+| `VOICE_MEMO_DIR` | `~/Recordings` | Output directory |
+| `VOICE_MEMO_TRANSCRIBE` | `1` | `0` disables transcription |
+| `VOICE_MEMO_CLIPBOARD` | `text` | `text` = transcript, `file` = MP3 file reference |
 
 ## Mockup
 

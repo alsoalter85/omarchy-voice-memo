@@ -1,13 +1,21 @@
 #!/usr/bin/env bash
-# voice-memo — toggle voice recording on Omarchy/Hyprland.
+# voice-memo — toggle voice recording on Omarchy/Hyprland, with local transcription.
 #
 # First run:  starts recording the default PipeWire source to a WAV in ~/Recordings
 #             and shows a persistent "Recording…" notification.
 # Second run: stops recording, encodes to MP3 (libmp3lame VBR ~165k), deletes the
-#             WAV, copies a file:// reference to the clipboard (text/uri-list),
-#             and swaps the notification for a "saved" summary.
+#             WAV, transcribes it locally via voxtype (whisper.cpp), saves the
+#             transcript next to the MP3 (.txt), copies the transcript text to the
+#             clipboard, and swaps the notification for a "saved" summary.
 #
-# Deps: pw-record (pipewire), ffmpeg, wl-copy (wl-clipboard), omarchy (notifications).
+# Deps: pw-record (pipewire), ffmpeg, wl-copy (wl-clipboard), omarchy (notifications),
+#       voxtype (transcription; optional — falls back to file-reference clipboard).
+#
+# Env knobs:
+#   VOICE_MEMO_DIR        output directory        (default: ~/Recordings)
+#   VOICE_MEMO_TRANSCRIBE 1 = transcribe, 0 = off (default: 1)
+#   VOICE_MEMO_CLIPBOARD  "text" = transcript, "file" = mp3 file reference
+#                         (default: text when transcription works, else file)
 
 set -u
 
@@ -41,6 +49,32 @@ start_recording() {
   notify -u critical -t 0 "● Recording…" "Press SUPER+SHIFT+R to stop"
 }
 
+# Transcribe an audio file with voxtype (whisper.cpp). Prints transcript on stdout,
+# empty on failure. Voxtype wants 16 kHz mono WAV, so convert via ffmpeg first.
+transcribe() {
+  local src="$1" tmpwav
+  tmpwav=$(mktemp /tmp/voice-memo-XXXXXX.wav) || return 1
+  ffmpeg -y -loglevel error -i "$src" -ar 16000 -ac 1 "$tmpwav" || { rm -f "$tmpwav"; return 1; }
+
+  # stdout noise ("Loading audio file:", "Audio format:", "Processing …") is
+  # filtered out; remaining non-empty lines are the transcript.
+  voxtype -q transcribe "$tmpwav" 2>/dev/null \
+    | sed 's/\x1b\[[0-9;]*m//g' \
+    | grep -v -e '^Loading audio file:' -e '^Audio format:' -e '^Processing ' \
+    | sed '/^[[:space:]]*$/d'
+
+  rm -f "$tmpwav"
+}
+
+copy_to_clipboard() {
+  # 9>&- : wl-copy stays alive to serve the clipboard; don't let it hold the lock.
+  if [[ -n "$1" && "${VOICE_MEMO_CLIPBOARD:-text}" != "file" ]]; then
+    printf '%s' "$1" | wl-copy 9>&-
+  else
+    printf 'file://%s\r\n' "$2" | wl-copy -t text/uri-list 9>&-
+  fi
+}
+
 stop_recording() {
   local pid wav
   read -r pid wav < "$STATE"
@@ -71,17 +105,34 @@ stop_recording() {
   fi
   rm -f "$wav"
 
-  # Clipboard: file reference so it pastes as a file (Slack, browsers, file managers).
-  # 9>&- : wl-copy stays alive to serve the clipboard; don't let it hold the lock.
-  printf 'file://%s\r\n' "$mp3" | wl-copy -t text/uri-list 9>&-
-
   local secs dur size
   secs=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$mp3" 2>/dev/null | cut -d. -f1)
   dur=$(printf '%02d:%02d' "$(( ${secs:-0} / 60 ))" "$(( ${secs:-0} % 60 ))")
   size=$(stat -c %s "$mp3" | numfmt --to=iec --suffix=B)
 
-  notify -t 8000 "Voice memo saved" "$(basename "$mp3") · $dur · $size
-Copied to clipboard — Ctrl+V to paste the file"
+  # Transcribe (swap the notification to show progress — the model load can take a moment).
+  local transcript=""
+  if [[ "${VOICE_MEMO_TRANSCRIBE:-1}" == "1" ]] && command -v voxtype >/dev/null 2>&1; then
+    notify -t 0 "Voice memo saved" "Transcribing…"
+    transcript=$(transcribe "$mp3")
+    if [[ -n "$transcript" ]]; then
+      printf '%s\n' "$transcript" > "${mp3%.mp3}.txt"
+    fi
+  fi
+
+  copy_to_clipboard "$transcript" "$mp3"
+
+  if [[ -n "$transcript" ]]; then
+    local preview
+    preview=$(printf '%s' "$transcript" | tr '\n' ' ' | cut -c1-90)
+    [[ ${#transcript} -gt 90 ]] && preview+="…"
+    notify -t 10000 "Voice memo saved" "$(basename "$mp3") · $dur · $size
+\"$preview\"
+Copied to clipboard"
+  else
+    notify -t 8000 "Voice memo saved" "$(basename "$mp3") · $dur · $size
+File reference copied to clipboard (no transcript)"
+  fi
 }
 
 if [[ -f "$STATE" ]]; then
