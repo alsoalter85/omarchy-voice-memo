@@ -34,9 +34,15 @@ fi
 if ! grep -q "voice-memo" "$HOME/.config/hypr/bindings.lua" 2>/dev/null; then
   cat <<'EOF'
 
-Add the keybinding to ~/.config/hypr/bindings.lua:
+Add the bindings to ~/.config/hypr/bindings.lua:
 
+    -- Toggle recording.
     o.bind("SUPER + SHIFT + R", "Voice memo", "voice-memo")
+
+    -- ESC-to-trash: consuming bind, armed only while recording.
+    voice_memo_esc = hl.bind("ESCAPE", hl.dsp.exec_cmd("voice-memo cancel"),
+      { description = "Voice memo: trash take" })
+    voice_memo_esc:set_enabled(false)
 
 Hyprland reloads automatically on save. Validate with: hyprctl configerrors
 EOF

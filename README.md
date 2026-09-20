@@ -31,10 +31,16 @@ Recordings live **only** in `~/Recordings/` (nothing in `/tmp` survives a reboot
 ```
 
 This symlinks `voice-memo` into `~/.local/bin` and checks dependencies.
-Then add the binding to `~/.config/hypr/bindings.lua` (installer reminds you):
+Then add the bindings to `~/.config/hypr/bindings.lua` (installer reminds you):
 
 ```lua
+-- Toggle recording.
 o.bind("SUPER + SHIFT + R", "Voice memo", "voice-memo")
+
+-- ESC-to-trash: consuming bind, armed only while recording (see "How it works").
+voice_memo_esc = hl.bind("ESCAPE", hl.dsp.exec_cmd("voice-memo cancel"),
+  { description = "Voice memo: trash take" })
+voice_memo_esc:set_enabled(false)
 ```
 
 Hyprland auto-reloads on save; verify with `hyprctl configerrors`.
@@ -59,7 +65,7 @@ download a bigger model, e.g. `small` or `large-v3-turbo`, and set `model = "sma
 - **Transcription**: MP3 → 16 kHz mono WAV (what whisper wants) → `voxtype -q transcribe`; stdout noise lines are filtered, the rest is the transcript.
 - **Clipboard**: two-stage — `text/uri-list` file reference the moment the MP3 exists, then replaced by the transcript text when transcription finishes (`VOICE_MEMO_CLIPBOARD=file` keeps the file reference).
 - **Auto-paste**: after the transcript lands on the clipboard, `wtype` injects the paste combo into the focused window.
-- **Trash**: `voice-memo cancel` stops the recorder and encodes the take to the trash dir instead of `~/Recordings`, skipping transcription and clipboard. It's wired to ESC via a consuming Hyprland bind that the script arms on record start and disarms on stop (`hyprctl eval 'voice_memo_esc:set_enabled(...)'`), so ESC is modal: captured only while a take is live.
+- **Trash**: `voice-memo cancel` stops the recorder and encodes the take to the trash dir instead of `~/Recordings`, skipping transcription and clipboard. It's wired to ESC via a consuming Hyprland bind (defined in `bindings.lua`, disabled at load) that the script arms on record start and disarms on stop via `hyprctl eval 'voice_memo_esc:set_enabled(...)'` — so ESC is modal: captured only while a take is live, passed through otherwise.
 - **Encoding**: `ffmpeg -codec:a libmp3lame -q:a 4` (VBR ~165 kbps).
 
 ## Custom vocabulary
