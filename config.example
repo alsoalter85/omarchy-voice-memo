@@ -9,7 +9,7 @@ VOICE_MEMO_AI=1
 # Legacy engines "claude" and "codex" remain available explicitly.
 VOICE_MEMO_AI_ENGINE=pi
 VOICE_MEMO_AI_PROVIDER=openrouter
-VOICE_MEMO_AI_MODEL=google/gemini-3.7-flash
+VOICE_MEMO_AI_MODEL=google/gemini-3.8-flash
 
 # Optional natural-language context; read as text, not shell code.
 # Copy cleanup-context.md.example here and customize it. Sent to the AI provider.

@@ -85,7 +85,7 @@ for flag in --print --no-session --no-tools --no-extensions --no-skills --no-con
   [[ "$args" == *" $flag "* ]] || exit 2
 done
 [[ "$args" == *" --provider openrouter "* ]] || exit 3
-[[ "$args" == *" --model google/gemini-3.7-flash "* ]] || exit 4
+[[ "$args" == *" --model google/gemini-3.8-flash "* ]] || exit 4
 [[ "$args" == *" --thinking off "* ]] || exit 5
 [[ "$args" == *" --system-prompt "* ]] || exit 6
 input=$(</dev/stdin)

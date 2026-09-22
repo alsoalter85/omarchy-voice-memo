@@ -92,7 +92,7 @@ Engines (set `VOICE_MEMO_AI_ENGINE` in the config):
 
 | Engine | Command used | Notes |
 |---|---|---|
-| `pi` (default) | `pi --print --provider openrouter --model google/gemini-3.7-flash --thinking off` | tools, extensions, context files, and session persistence disabled |
+| `pi` (default) | `pi --print --provider openrouter --model google/gemini-3.8-flash --thinking off` | tools, extensions, context files, and session persistence disabled |
 | `claude` | `claude -p --model haiku` | fast; override model via `VOICE_MEMO_AI_MODEL` |
 | `codex` | `codex exec --ephemeral -s read-only -m gpt-6-astra …` | runs read-only + ephemeral; ~10 s extra latency |
 
@@ -145,7 +145,7 @@ on the next memo without a restart.
 | `VOICE_MEMO_AI` | `0` | `1` enables the AI cleanup pass (set in `~/.config/voice-memo/config`) |
 | `VOICE_MEMO_AI_ENGINE` | `pi` | `pi`, `claude`, or `codex`; ignored when `VOICE_MEMO_AI_CMD` is set |
 | `VOICE_MEMO_AI_PROVIDER` | `openrouter` | Provider for Pi; uses existing Pi authentication |
-| `VOICE_MEMO_AI_MODEL` | `google/gemini-3.7-flash` / `haiku` / `gpt-6-astra` | Model for the chosen engine |
+| `VOICE_MEMO_AI_MODEL` | `google/gemini-3.8-flash` / `haiku` / `gpt-6-astra` | Model for the chosen engine |
 | `VOICE_MEMO_AI_CONTEXT_FILE` | `~/.config/voice-memo/cleanup-context.md` | Optional natural-language preferences for preset engines |
 | `VOICE_MEMO_AI_CMD` | — | Full override: any command, transcript on stdin, cleaned text on stdout |
 | `VOICE_MEMO_AI_TIMEOUT` | `60` | Seconds before falling back to the raw transcript |
