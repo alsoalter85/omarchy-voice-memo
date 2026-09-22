@@ -27,8 +27,9 @@
 #                         (default: ctrl+v; use ctrl+shift+v for terminals)
 #   VOICE_MEMO_AI         1 = run the transcript through an AI cleanup pass
 #                         (filler words, punctuation) before clipboard/paste
-#   VOICE_MEMO_AI_ENGINE  claude (default) | codex   (codex model via
-#                         VOICE_MEMO_AI_MODEL, default gpt-6-astra)
+#   VOICE_MEMO_AI_ENGINE  pi (default) | claude | codex
+#   VOICE_MEMO_AI_PROVIDER Pi provider (default: openrouter)
+#   VOICE_MEMO_AI_MODEL   Pi default: google/gemini-3.7-flash; reasoning off
 #   VOICE_MEMO_AI_CMD     full override: any command, transcript on stdin,
 #                         cleaned text on stdout
 #   VOICE_MEMO_AI_TIMEOUT seconds before giving up and keeping the raw
@@ -179,7 +180,18 @@ ai_cleanup() {
     printf '%s' "$1" | timeout "$timeout_s" bash -c "$VOICE_MEMO_AI_CMD" 2>/dev/null
     return
   fi
-  case "${VOICE_MEMO_AI_ENGINE:-claude}" in
+  case "${VOICE_MEMO_AI_ENGINE:-pi}" in
+    pi)
+      command -v pi >/dev/null 2>&1 || return 1
+      local cleaned
+      cleaned=$(printf '%s' "$1" | timeout "$timeout_s" pi --print --mode text \
+        --no-session --no-tools --no-extensions --no-skills \
+        --no-context-files --no-prompt-templates \
+        --provider "${VOICE_MEMO_AI_PROVIDER:-openrouter}" \
+        --model "${VOICE_MEMO_AI_MODEL:-google/gemini-3.7-flash}" \
+        --thinking off --system-prompt "$AI_PROMPT" 2>/dev/null) || return 1
+      printf '%s' "$cleaned"
+      ;;
     claude)
       command -v claude >/dev/null 2>&1 || return 1
       printf '%s' "$1" | timeout "$timeout_s" claude -p \
