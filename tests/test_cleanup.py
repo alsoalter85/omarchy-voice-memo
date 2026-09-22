@@ -1,0 +1,101 @@
+"""Exercise the actual Bash cleanup function without recording or clipboard access."""
+import os
+from pathlib import Path
+import subprocess
+import tempfile
+import unittest
+
+SOURCE = Path(__file__).resolve().parents[1] / 'voice-memo'
+
+
+def cleanup_shell():
+    text = SOURCE.read_text()
+    return text[text.index('AI_PROMPT='):text.index('# ESC path:')]
+
+
+class CleanupTests(unittest.TestCase):
+    def run_cleanup(self, stub, context=None, **overrides):
+        with tempfile.TemporaryDirectory() as directory:
+            pi = Path(directory) / 'pi'
+            pi.write_text('#!/bin/bash\n' + stub)
+            pi.chmod(0o755)
+            env = {k: v for k, v in os.environ.items() if not k.startswith('VOICE_MEMO_AI')}
+            env.update(PATH=directory + ':' + env['PATH'], HOME=directory, VOICE_MEMO_AI_ENGINE='pi')
+            env.update(overrides)
+            if context is not None:
+                context_path = Path(env.get('VOICE_MEMO_AI_CONTEXT_FILE', directory + '/.config/voice-memo/cleanup-context.md'))
+                context_path.parent.mkdir(parents=True, exist_ok=True)
+                context_path.write_text(context)
+            return subprocess.run(['bash', '-c', cleanup_shell() + '\nai_cleanup "um hello world"'],
+                                  env=env, text=True, capture_output=True, timeout=10)
+
+    def test_context_in_system_prompt_not_transcript(self):
+        context = 'My name is Alessandro.\nScaleStack → Scalestack\nStyle: informal.\n$(printf DO_NOT_EXECUTE)'
+        result = self.run_cleanup('''while [[ $# -gt 0 ]]; do
+  if [[ "$1" == --system-prompt ]]; then printf '%s' "$2"; fi
+  shift
+done
+[[ "$(</dev/stdin)" == 'um hello world' ]] || exit 7
+''', context=context)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn(context, result.stdout)
+        self.assertIn('do not summarize', result.stdout)
+
+    def test_missing_and_empty_context_preserve_base_prompt(self):
+        stub = '''while [[ $# -gt 0 ]]; do
+  if [[ "$1" == --system-prompt ]]; then printf '%s' "$2"; fi
+  shift
+done'''
+        missing = self.run_cleanup(stub)
+        empty = self.run_cleanup(stub, context='')
+        self.assertEqual(missing.stdout, empty.stdout)
+        self.assertNotIn('User cleanup preferences', missing.stdout)
+
+    def test_context_path_override_with_spaces(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = self.run_cleanup('printf "%s" "$*"', context='Custom vocabulary',
+                VOICE_MEMO_AI_CONTEXT_FILE=directory + '/my preferences.md')
+            self.assertIn('Custom vocabulary', result.stdout)
+
+    def test_failure_discards_partial_output(self):
+        result = self.run_cleanup("printf 'Partial output'; exit 1")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, '')
+
+    def test_timeout_discards_partial_output(self):
+        result = self.run_cleanup("printf 'Partial output'; sleep 3", VOICE_MEMO_AI_TIMEOUT='0.1')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, '')
+
+    def test_empty_response_returns_empty_for_caller_fallback(self):
+        result = self.run_cleanup('exit 0')
+        self.assertEqual(result.stdout, '')
+
+    def test_provider_and_model_overrides(self):
+        result = self.run_cleanup('''[[ " $* " == *" --provider google "* ]] || exit 2
+[[ " $* " == *" --model custom-model "* ]] || exit 3
+printf 'Override works'
+''', VOICE_MEMO_AI_PROVIDER='google', VOICE_MEMO_AI_MODEL='custom-model')
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, 'Override works')
+
+    def test_pi_flags_and_stdin(self):
+        stub = '''args=" $* "
+for flag in --print --no-session --no-tools --no-extensions --no-skills --no-context-files --no-prompt-templates; do
+  [[ "$args" == *" $flag "* ]] || exit 2
+done
+[[ "$args" == *" --provider openrouter "* ]] || exit 3
+[[ "$args" == *" --model google/gemini-3.8-flash "* ]] || exit 4
+[[ "$args" == *" --thinking off "* ]] || exit 5
+[[ "$args" == *" --system-prompt "* ]] || exit 6
+input=$(</dev/stdin)
+[[ "$input" == 'um hello world' ]] || exit 7
+printf 'Hello world.'
+'''
+        result = self.run_cleanup(stub)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, 'Hello world.')
+
+
+if __name__ == '__main__':
+    unittest.main()

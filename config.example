@@ -5,12 +5,16 @@
 # on any failure or timeout.
 VOICE_MEMO_AI=1
 
-# Engine: "claude" (fast, works today) or "codex" (gpt-6-astra — your pick,
-# but the Codex quota is exhausted until 2026-09-23; flip then if you prefer).
-VOICE_MEMO_AI_ENGINE=claude
+# Pi uses its existing provider authentication. Reasoning is disabled.
+# Legacy engines "claude" and "codex" remain available explicitly.
+VOICE_MEMO_AI_ENGINE=pi
+VOICE_MEMO_AI_PROVIDER=openrouter
+VOICE_MEMO_AI_MODEL=google/gemini-3.8-flash
 
-# Optional model override per engine (default: haiku / gpt-6-astra).
-# VOICE_MEMO_AI_MODEL=haiku
+# Optional natural-language context; read as text, not shell code.
+# Copy cleanup-context.md.example here and customize it. Sent to the AI provider.
+# VOICE_MEMO_AI_CONTEXT_FILE="$HOME/.config/voice-memo/cleanup-context.md"
 
 # Full override: any command; transcript on stdin, cleaned text on stdout.
+# Custom commands must load context themselves.
 # VOICE_MEMO_AI_CMD='my-cleaner --fast'
