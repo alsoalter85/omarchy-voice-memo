@@ -112,6 +112,26 @@ use that engine's default, or set a model supported by that engine.
 Run cleanup regression tests without recording or network access:
 `python3 -m unittest discover -s tests -v`.
 
+## Personal cleanup context
+
+Copy `cleanup-context.md.example` to `~/.config/voice-memo/cleanup-context.md`
+and edit it in natural language. Include your name, vocabulary, substitutions,
+and style preferences. The file is optional and read fresh for every cleanup;
+missing or empty files leave the base prompt unchanged. It is read as text,
+never executed as shell code.
+
+Pi, Claude, and Codex presets receive this context along with the cleanup
+instructions. Custom `VOICE_MEMO_AI_CMD` commands keep their existing stdin-only
+contract and must load context themselves. Context affects AI cleanup only;
+the deterministic `replacements` file remains available for exact corrections.
+
+The context is sent to your selected AI provider with every cleanup. Do not put
+passwords, API keys, or unrelated sensitive information in it. Keep your actual
+personal file outside the repository; only the generic example is committed.
+
+Override the path with `VOICE_MEMO_AI_CONTEXT_FILE` if needed. File edits apply
+on the next memo without a restart.
+
 ## Configuration
 
 | Env var | Default | Purpose |
@@ -126,6 +146,7 @@ Run cleanup regression tests without recording or network access:
 | `VOICE_MEMO_AI_ENGINE` | `pi` | `pi`, `claude`, or `codex`; ignored when `VOICE_MEMO_AI_CMD` is set |
 | `VOICE_MEMO_AI_PROVIDER` | `openrouter` | Provider for Pi; uses existing Pi authentication |
 | `VOICE_MEMO_AI_MODEL` | `google/gemini-3.7-flash` / `haiku` / `gpt-6-astra` | Model for the chosen engine |
+| `VOICE_MEMO_AI_CONTEXT_FILE` | `~/.config/voice-memo/cleanup-context.md` | Optional natural-language preferences for preset engines |
 | `VOICE_MEMO_AI_CMD` | — | Full override: any command, transcript on stdin, cleaned text on stdout |
 | `VOICE_MEMO_AI_TIMEOUT` | `60` | Seconds before falling back to the raw transcript |
 | `VOICE_MEMO_CONFIG` | `~/.config/voice-memo/config` | Config file path (plain bash, sourced on every run) |

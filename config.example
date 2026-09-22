@@ -11,5 +11,10 @@ VOICE_MEMO_AI_ENGINE=pi
 VOICE_MEMO_AI_PROVIDER=openrouter
 VOICE_MEMO_AI_MODEL=google/gemini-3.7-flash
 
+# Optional natural-language context; read as text, not shell code.
+# Copy cleanup-context.md.example here and customize it. Sent to the AI provider.
+# VOICE_MEMO_AI_CONTEXT_FILE="$HOME/.config/voice-memo/cleanup-context.md"
+
 # Full override: any command; transcript on stdin, cleaned text on stdout.
+# Custom commands must load context themselves.
 # VOICE_MEMO_AI_CMD='my-cleaner --fast'

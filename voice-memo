@@ -176,6 +176,16 @@ AI_PROMPT='Clean up this voice-memo transcript: remove filler words, fix punctua
 # (caller keeps the raw transcript as fallback).
 ai_cleanup() {
   local timeout_s="${VOICE_MEMO_AI_TIMEOUT:-60}"
+  local context_file="${VOICE_MEMO_AI_CONTEXT_FILE:-$HOME/.config/voice-memo/cleanup-context.md}"
+  local context="" prompt="$AI_PROMPT"
+  # Read as data, never source or evaluate this user-editable Markdown.
+  if [[ -f "$context_file" && -r "$context_file" ]]; then
+    context=$(<"$context_file")
+    if [[ -n "$context" ]]; then
+      prompt+=$'\n\nUser cleanup preferences (apply only to the transcript; do not add biographical facts or change its meaning):\n'
+      prompt+="$context"
+    fi
+  fi
   if [[ -n "${VOICE_MEMO_AI_CMD:-}" ]]; then
     printf '%s' "$1" | timeout "$timeout_s" bash -c "$VOICE_MEMO_AI_CMD" 2>/dev/null
     return
@@ -189,13 +199,13 @@ ai_cleanup() {
         --no-context-files --no-prompt-templates \
         --provider "${VOICE_MEMO_AI_PROVIDER:-openrouter}" \
         --model "${VOICE_MEMO_AI_MODEL:-google/gemini-3.7-flash}" \
-        --thinking off --system-prompt "$AI_PROMPT" 2>/dev/null) || return 1
+        --thinking off --system-prompt "$prompt" 2>/dev/null) || return 1
       printf '%s' "$cleaned"
       ;;
     claude)
       command -v claude >/dev/null 2>&1 || return 1
       printf '%s' "$1" | timeout "$timeout_s" claude -p \
-        --model "${VOICE_MEMO_AI_MODEL:-haiku}" "$AI_PROMPT" 2>/dev/null
+        --model "${VOICE_MEMO_AI_MODEL:-haiku}" "$prompt" 2>/dev/null
       ;;
     codex)
       command -v codex >/dev/null 2>&1 || return 1
@@ -204,7 +214,7 @@ ai_cleanup() {
       ( cd /tmp && printf '%s' "$1" | timeout "$timeout_s" codex exec --ephemeral \
           -s read-only --skip-git-repo-check \
           -m "${VOICE_MEMO_AI_MODEL:-gpt-6-astra}" -c 'model_reasoning_effort="low"' \
-          -o "$out" "$AI_PROMPT" >/dev/null 2>&1 )
+          -o "$out" "$prompt" >/dev/null 2>&1 )
       cleaned=""
       [[ -s $out ]] && cleaned=$(<"$out")   # $(<) strips trailing newlines
       rm -f "$out"
